@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Un sueño dentro de otro sueño (v 2.0)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#06070a;
+    --ink:#ebe7de;
+    --dim:#8a8f9c;
+    --green:#86d993;
+    --pink:#ff3d7f;
+    --cyan:#2fe0ee;
+    --serif:"Cormorant Garamond", Georgia, serif;
+    --mono:"IBM Plex Mono", ui-monospace, monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--ink);overflow:hidden}
+  body{font-family:var(--serif);-webkit-font-smoothing:antialiased}
+
+  canvas#feed{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+
+  #bg404{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:500;font-size:min(42vw,52vh);letter-spacing:-.04em;
+    color:rgba(255,255,255,.035);opacity:0;transition:opacity 2.4s ease;z-index:1;pointer-events:none;user-select:none}
+  #bg404.on{opacity:1}
+
+  svg#garden{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;transition:opacity 2s ease}
+  .crack{fill:none;stroke:rgba(160,175,210,.38);stroke-width:1.6;stroke-linejoin:bevel;stroke-linecap:round;
+    transition:stroke-dashoffset 3.2s cubic-bezier(.6,.05,.3,1)}
+  .blade{fill:none;stroke-linecap:round;transition:stroke-dashoffset 1.8s cubic-bezier(.2,.7,.2,1);
+    transform-box:fill-box;transform-origin:50% 100%}
+  .blade.sway{animation:sway 4.5s ease-in-out infinite alternate}
+  @keyframes sway{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
+
+  #nest{position:fixed;inset:0;z-index:3;pointer-events:none;opacity:0;transition:opacity 2.5s ease}
+  #nest.on{opacity:1}
+  #nest .frame{position:absolute;left:50%;top:50%;width:70vmin;height:48vmin;margin:-24vmin 0 0 -35vmin;
+    border:1px solid rgba(235,231,222,.22);border-radius:14px;opacity:0;animation:zoom 12s linear infinite}
+  @keyframes zoom{0%{transform:scale(.08);opacity:0}15%{opacity:.7}80%{opacity:.25}100%{transform:scale(2.6);opacity:0}}
+
+  #loader{position:fixed;top:0;left:0;height:2px;width:0;background:linear-gradient(90deg,var(--cyan),#fff);
+    box-shadow:0 0 10px var(--cyan);z-index:20;opacity:0;transition:width 2.6s cubic-bezier(.1,.8,.2,1),opacity .6s}
+  #loader.on{opacity:1}
+  #loader.stall{animation:stall 1.1s steps(2) infinite}
+  @keyframes stall{50%{opacity:.25}}
+
+  #shutter{position:fixed;inset:0;background:#fff;opacity:0;z-index:30;pointer-events:none}
+  #shutter.go{animation:shutter .45s ease-out}
+  @keyframes shutter{0%{opacity:0}12%{opacity:.32}100%{opacity:0}}
+
+  .scan{position:fixed;inset:0;z-index:40;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
+               radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.65) 100%)}
+
+  header.file{position:fixed;top:18px;left:20px;z-index:25;font-family:var(--mono);font-size:11px;
+    letter-spacing:.06em;color:var(--dim);opacity:0;transition:opacity 1.5s}
+  footer.meta{position:fixed;bottom:16px;left:20px;right:20px;z-index:25;display:flex;justify-content:space-between;
+    font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--dim);opacity:0;transition:opacity 1.5s}
+  body.playing header.file, body.playing footer.meta{opacity:.7}
+
+  main#stage{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:8vh 7vw}
+  #stanza{width:min(100%,34ch);font-size:clamp(1.3rem,4.4vw,2.15rem);line-height:1.42;font-weight:500;
+    transition:opacity 1.2s ease, filter 1.2s ease;text-shadow:0 0 18px rgba(0,0,0,.9)}
+  #stanza.out{opacity:0;filter:blur(6px)}
+  #stanza.final{text-align:center;width:min(100%,36ch)}
+  .line{min-height:1.42em;transition:opacity 3.5s ease, filter 3.5s ease}
+
+  .mono{font-family:var(--mono);font-size:.78em;font-weight:400;letter-spacing:-.01em;color:#cfd6e6}
+  .shot{transition:outline-color .3s;outline:1px dashed transparent;outline-offset:3px}
+  .shot.captured{outline-color:rgba(255,255,255,.55)}
+  .forget{opacity:.42;filter:blur(1.4px)}
+  .green{color:var(--green);text-shadow:0 0 14px rgba(134,217,147,.35)}
+  .void{transition:letter-spacing 3s ease, opacity 3s ease;display:inline-block}
+  .void.open{letter-spacing:.32em;opacity:.35}
+  .crackw{background:linear-gradient(transparent 58%,rgba(134,217,147,.28) 58% 66%,transparent 66%)}
+  .bright{color:#fff;font-weight:600;text-shadow:0 0 22px rgba(255,255,255,.35)}
+
+  .txt{background:linear-gradient(currentColor,currentColor) no-repeat 0 58%/0% 1px;
+    transition:background-size 1.4s ease, opacity 1.4s;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+  .txt.struck{background-size:100% 1px;opacity:.55}
+
+  .caret{display:inline-block;width:.09em;height:.95em;margin-left:.06em;vertical-align:-.1em;background:var(--ink);
+    animation:blink 1.05s steps(1) infinite}
+  .caret.typing{animation:none}
+  .caret.final{width:.12em;box-shadow:0 0 14px rgba(255,255,255,.8);animation-duration:1.3s}
+  @keyframes blink{50%{opacity:0}}
+
+  .glitch{position:relative;display:inline-block}
+  .glitch::before,.glitch::after{content:attr(data-text);position:absolute;left:0;top:0;width:100%;height:100%;
+    mix-blend-mode:screen;pointer-events:none}
+  .glitch::before{color:var(--pink);animation:g1 2.3s infinite steps(1)}
+  .glitch::after{color:var(--cyan);animation:g2 1.8s infinite steps(1)}
+  @keyframes g1{0%{clip-path:inset(0 0 82% 0);transform:translate(-3px,0)}
+    18%{clip-path:inset(38% 0 34% 0);transform:translate(-4px,1px)}
+    36%{clip-path:inset(78% 0 4% 0);transform:translate(2px,0)}
+    54%{clip-path:inset(12% 0 62% 0);transform:translate(-2px,-1px)}
+    72%{clip-path:inset(55% 0 22% 0);transform:translate(3px,1px)}
+    90%{clip-path:inset(0 0 100% 0)}}
+  @keyframes g2{0%{clip-path:inset(60% 0 12% 0);transform:translate(3px,0)}
+    22%{clip-path:inset(5% 0 75% 0);transform:translate(4px,-1px)}
+    44%{clip-path:inset(42% 0 40% 0);transform:translate(-3px,1px)}
+    66%{clip-path:inset(85% 0 2% 0);transform:translate(2px,0)}
+    88%{clip-path:inset(0 0 100% 0)}}
+
+  body.shake main#stage{animation:shake .5s steps(2)}
+  @keyframes shake{0%{transform:translate(0)}20%{transform:translate(-6px,2px) skewX(-2deg)}
+    40%{transform:translate(5px,-2px)}60%{transform:translate(-3px,1px) skewX(3deg)}80%{transform:translate(2px,0)}100%{transform:none}}
+
+  #intro{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:1.4rem;padding:2rem;text-align:center;transition:opacity 1.3s ease, filter 1.3s ease}
+  #intro.out{opacity:0;filter:blur(8px);pointer-events:none}
+  #intro h1{font-family:var(--serif);font-weight:500;font-size:clamp(1.7rem,6vw,3.6rem);letter-spacing:.06em;line-height:1.15;max-width:16ch}
+  #intro .ver{font-family:var(--mono);font-size:.8rem;letter-spacing:.3em;color:var(--dim)}
+  button.cta{font-family:var(--mono);font-size:.85rem;letter-spacing:.14em;color:var(--ink);background:transparent;
+    border:1px solid rgba(235,231,222,.35);border-radius:999px;padding:.8rem 1.6rem;cursor:pointer;
+    transition:background .3s,border-color .3s,opacity 1s}
+  button.cta:hover,button.cta:focus-visible{background:rgba(235,231,222,.08);border-color:var(--ink);outline:none}
+  #replay{position:fixed;left:50%;bottom:9vh;transform:translateX(-50%);z-index:60;opacity:0;pointer-events:none}
+  #replay.on{opacity:1;pointer-events:auto}
+
+  #mute{position:fixed;top:12px;right:14px;z-index:70;font-family:var(--mono);font-size:11px;letter-spacing:.08em;
+    color:var(--dim);background:transparent;border:1px solid transparent;border-radius:999px;padding:.4rem .7rem;cursor:pointer;transition:color .3s,border-color .3s}
+  #mute:hover,#mute:focus-visible{color:var(--ink);border-color:rgba(235,231,222,.3);outline:none}
+  #intro .hp{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;color:var(--dim);opacity:.8}
+  @media (prefers-reduced-motion: reduce){
+    .glitch::before,.glitch::after,.blade.sway,#nest .frame,body.shake main#stage{animation:none!important}
+    #nest .frame{opacity:.2}
+  }
+</style>
+</head>
+<body>
+  <canvas id="feed" aria-hidden="true"></canvas>
+  <div id="bg404" aria-hidden="true">404</div>
+  <svg id="garden" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+    <g id="cracks"></g><g id="grass"></g>
+  </svg>
+  <div id="nest" aria-hidden="true"></div>
+  <div id="loader" aria-hidden="true"></div>
+  <div id="shutter" aria-hidden="true"></div>
+
+  <header class="file">un_sueño_dentro_de_otro_sueño.v2.0</header>
+  <main id="stage" aria-live="polite"><div id="stanza"></div></main>
+  <footer class="meta"><span id="hint">toca para acelerar</span><span id="count">01 / 04</span></footer>
+
+  <section id="intro">
+    <h1 class="glitch" data-text="UN SUEÑO DENTRO DE OTRO SUEÑO">UN SUEÑO DENTRO DE OTRO SUEÑO</h1>
+    <p class="ver">V 2.0</p>
+    <button class="cta" id="play">▶ REPRODUCIR</button>
+    <p class="hp">MEJOR CON AUDÍFONOS</p>
+  </section>
+  <button id="mute" aria-pressed="true">♪ SONIDO: SÍ</button>
+  <button class="cta" id="replay">↻ VOLVER A SOÑAR</button>
+  <div class="scan" aria-hidden="true"></div>
+
+<script>
+(() => {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = s => document.querySelector(s);
+  const stanzaEl = $('#stanza'), body = document.body;
+  const caret = document.createElement('span'); caret.className = 'caret';
+  let hurry = false;
+
+  const wait = ms => new Promise(r => setTimeout(r, hurry ? ms * 0.12 : ms));
+  const delayFor = ch => ch === ',' ? 260 : ch === '.' ? 520 : ch === ':' ? 420 : ch === ' ' ? 34 : 36 + Math.random() * 34;
+
+  /* ---------- sonido (sintetizado con Web Audio) ---------- */
+  const Snd = (() => {
+    let ctx = null, master, noise, on = true;
+    const amb = {}, timers = [];
+    const now = () => ctx.currentTime;
+    function init(){
+      if (ctx){ ctx.resume(); return; }
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      ctx = new AC();
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
+      master = ctx.createGain(); master.gain.value = on ? .9 : 0;
+      master.connect(comp); comp.connect(ctx.destination);
+      noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+      // murmullo del feed: ruido filtrado que respira
+      amb.feed = loopNoise('bandpass', 520, .6);
+      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = .13; lg.gain.value = 260;
+      lfo.connect(lg).connect(amb.feed.filter.frequency); lfo.start();
+      // susurro de la hierba
+      amb.rustle = loopNoise('highpass', 3200, .4);
+      const lfo2 = ctx.createOscillator(), lg2 = ctx.createGain(); lfo2.frequency.value = .21; lg2.gain.value = 900;
+      lfo2.connect(lg2).connect(amb.rustle.filter.frequency); lfo2.start();
+      // zumbido mudo de la pantalla
+      amb.hum = ctx.createGain(); amb.hum.gain.value = 0; amb.hum.connect(master);
+      [120, 180, 240].forEach((f, i) => { const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.value = [.6, .25, .12][i]; o.connect(g).connect(amb.hum); o.start(); });
+      // pad de sueño
+      amb.pad = ctx.createGain(); amb.pad.gain.value = 0;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300; lp.connect(amb.pad); amb.pad.connect(master);
+      [110, 164.81, 246.94, 277.18, 329.63, 493.88].forEach(f => [-4, 4].forEach(det => {
+        const o = ctx.createOscillator(); o.type = f > 300 ? 'sine' : 'triangle'; o.frequency.value = f; o.detune.value = det;
+        const g = ctx.createGain(); g.gain.value = f > 300 ? .08 : .14; o.connect(g).connect(lp); o.start();
+      }));
+    }
+    function loopNoise(type, freq, q){
+      const src = ctx.createBufferSource(); src.buffer = noise; src.loop = true;
+      const filter = ctx.createBiquadFilter(); filter.type = type; filter.frequency.value = freq; filter.Q.value = q;
+      const gain = ctx.createGain(); gain.gain.value = 0;
+      src.connect(filter).connect(gain).connect(master); src.start();
+      return { filter, gain };
+    }
+    function ramp(g, v, sec){ if (!ctx) return; const p = g.gain || g; p.cancelScheduledValues(now()); p.setValueAtTime(p.value, now()); p.linearRampToValueAtTime(v, now() + sec); }
+    function burst({ dur = .03, freq = 2000, q = 1, type = 'bandpass', vol = .2, attack = .001, when = 0, sweep = null }){
+      if (!ctx) return; const t = now() + when;
+      const s = ctx.createBufferSource(); s.buffer = noise;
+      const f = ctx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+      if (sweep) f.frequency.exponentialRampToValueAtTime(sweep, t + dur);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 1.5, dur + .05);
+    }
+    function tone({ freq = 440, type = 'sine', dur = .3, vol = .1, attack = .005, to = null, when = 0 }){
+      if (!ctx) return; const t = now() + when;
+      const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      o.connect(g).connect(master); o.start(t); o.stop(t + dur + .05);
+    }
+    const every = (fn, ms) => { const id = setInterval(fn, ms); timers.push(id); return id; };
+    const stop = id => clearInterval(id);
+    let loadTimer = null, blinkTimer = null;
+    return {
+      init,
+      toggle(){ on = !on; if (ctx) ramp(master, on ? .9 : 0, .3); return on; },
+      key(ch){
+        if (!ctx) return;
+        if (ch === ' ') return burst({ dur: .03, freq: 700, q: .7, vol: .05 });
+        const heavy = '.,:'.includes(ch);
+        burst({ dur: .018 + Math.random() * .014, freq: (heavy ? 1300 : 2300) + Math.random() * 1600, q: 1.3, vol: (heavy ? .09 : .055) + Math.random() * .03 });
+        tone({ freq: (heavy ? 120 : 190) + Math.random() * 40, dur: .035, vol: heavy ? .04 : .018 });
+      },
+      shutter(){ burst({ dur: .05, freq: 3800, q: .6, vol: .32 }); burst({ dur: .07, freq: 2200, q: .6, vol: .22, when: .09 }); tone({ freq: 1500, to: 600, dur: .08, vol: .03, when: .02 }); },
+      strike(){ burst({ dur: 1.3, freq: 700, sweep: 3200, q: 2.5, vol: .05, attack: .08 }); },
+      whoosh(){ burst({ dur: 1.3, freq: 2400, sweep: 220, type: 'lowpass', q: .5, vol: .07, attack: .25 }); },
+      error(){ tone({ freq: 220, type: 'square', dur: .2, vol: .035 }); tone({ freq: 165, type: 'square', dur: .35, vol: .035, when: .22 }); },
+      crackle(sec = 3.4){ for (let i = 0; i < 70; i++) burst({ dur: .006 + Math.random() * .02, freq: 900 + Math.random() * 4000, q: 4, vol: .04 + Math.random() * .12 * Math.random(), when: Math.pow(Math.random(), 1.4) * sec }); },
+      feed(v, sec = 2.5){ if (ctx) ramp(amb.feed.gain, v, sec); },
+      rustle(v, sec = 2.5){ if (ctx) ramp(amb.rustle.gain, v, sec); },
+      hum(v, sec = 2){ if (ctx) ramp(amb.hum, v, sec); },
+      pad(v, sec = 4){ if (ctx) ramp(amb.pad, v, sec); },
+      voidSweep(){ tone({ freq: 660, to: 82, dur: 3.2, vol: .045, attack: .9 }); tone({ freq: 663, to: 80, dur: 3.2, vol: .03, attack: .9 }); },
+      tick(vol = .05){ burst({ dur: .012, freq: 5200, q: 3, vol }); tone({ freq: 1900, dur: .02, vol: vol * .5 }); },
+      loading(){ stop(loadTimer); loadTimer = every(() => this.tick(.035), 170); },
+      stall(){ stop(loadTimer); const go = () => { this.tick(.045); loadTimer = setTimeout(go, 350 + Math.random() * 900); timers.push(loadTimer); }; go(); },
+      loaded(){ stop(loadTimer); clearTimeout(loadTimer); },
+      glitch(){
+        for (let i = 0; i < 12; i++){
+          const w = i * .04 + Math.random() * .02;
+          tone({ freq: 70 + Math.random() * 1500, type: Math.random() > .5 ? 'square' : 'sawtooth', dur: .035, vol: .05, when: w });
+          if (Math.random() > .4) burst({ dur: .03, freq: 500 + Math.random() * 5000, q: 8, vol: .1, when: w });
+        }
+      },
+      bell(f, vol = .08){ tone({ freq: f, dur: 3.5, vol, attack: .004 }); tone({ freq: f * 2.76, dur: 1.4, vol: vol * .3, attack: .004 }); tone({ freq: f * 5.4, dur: .6, vol: vol * .12, attack: .004 }); },
+      blink(n = 12){ let k = 0; this.tick(.025); blinkTimer = every(() => { if (++k >= n) return stop(blinkTimer); this.tick(.025); }, 1300); },
+      reset(){
+        timers.forEach(id => { clearInterval(id); clearTimeout(id); }); timers.length = 0;
+        if (!ctx) return; ramp(amb.feed.gain, 0, 1); ramp(amb.rustle.gain, 0, 1); ramp(amb.hum, 0, 1); ramp(amb.pad, 0, 1.5);
+      }
+    };
+  })();
+
+  /* ---------- feed sin fondo ---------- */
+  const cv = $('#feed'), cx = cv.getContext('2d');
+  const feed = { a: 0, target: 0, speed: 50 };
+  let W, H, cols = [];
+  function rr(x, y, w, h, r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+  function newCard(x, y, w){ return { x, y, w, h: 110 + Math.random()*180, img: Math.random() > .45, bars: 1 + (Math.random()*3|0), n: 50 + Math.random()*90 }; }
+  function build(){
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; cx.setTransform(dpr,0,0,dpr,0,0);
+    const colW = W < 600 ? 200 : 260, n = Math.ceil(W / colW) + 1, off = (W - n*colW)/2;
+    cols = [];
+    for (let i = 0; i < n; i++){
+      const cards = []; let y = -Math.random()*240; const x = off + i*colW + 14, w = colW - 28;
+      while (y < H + 300){ const c = newCard(x, y, w); cards.push(c); y += c.h + 20; }
+      cols.push({ cards, k: .75 + Math.random()*.5, x, w });
+    }
+  }
+  function drawCard(c, a){
+    rr(c.x, c.y, c.w, c.h, 12);
+    cx.fillStyle = `rgba(255,255,255,${.028*a})`; cx.fill();
+    cx.strokeStyle = `rgba(190,205,255,${.11*a})`; cx.lineWidth = 1; cx.stroke();
+    cx.fillStyle = `rgba(255,255,255,${.07*a})`;
+    cx.beginPath(); cx.arc(c.x+20, c.y+22, 8, 0, 6.283); cx.fill();
+    cx.fillRect(c.x+36, c.y+18, c.n, 7);
+    let y = c.y + 44;
+    if (c.img && c.h > 150){ cx.fillStyle = `rgba(255,255,255,${.035*a})`; rr(c.x+12, y, c.w-24, c.h-90, 8); cx.fill(); y = c.y + c.h - 38; }
+    cx.fillStyle = `rgba(255,255,255,${.05*a})`;
+    for (let b = 0; b < c.bars && y < c.y + c.h - 12; b++){ cx.fillRect(c.x+12, y, (c.w-24)*(b === c.bars-1 ? .55 : .92), 6); y += 14; }
+  }
+  let last = performance.now();
+  function frame(t){
+    const dt = Math.min(.05, (t - last)/1000); last = t;
+    feed.a += (feed.target - feed.a) * Math.min(1, dt*1.2);
+    cx.clearRect(0, 0, W, H);
+    if (feed.a > .004){
+      for (const col of cols){
+        const v = (reduced ? .15 : 1) * feed.speed * col.k * dt;
+        for (const c of col.cards){ c.y -= v; drawCard(c, feed.a); }
+        const f = col.cards[0];
+        if (f.y + f.h < -20){ col.cards.shift(); const l = col.cards[col.cards.length-1]; col.cards.push(newCard(col.x, l.y + l.h + 20, col.w)); }
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  build(); addEventListener('resize', build); requestAnimationFrame(frame);
+
+  /* ---------- prado sobre el 404 ---------- */
+  const NS = 'http://www.w3.org/2000/svg';
+  const gCr = $('#cracks'), gGr = $('#grass');
+  let blades = [], grown = 0;
+  function el(tag, attrs){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function seedGarden(){
+    gCr.innerHTML = ''; gGr.innerHTML = ''; blades = []; grown = 0;
+    const cracks = 6;
+    for (let i = 0; i < cracks; i++){
+      let x = (i + .2 + Math.random()*.6) * (1000/cracks) - 60, y = 885 + Math.random()*95;
+      const dir = Math.random() > .5 ? 1 : -1, pts = [[x,y]];
+      for (let s = 0; s < 7 + (Math.random()*5|0); s++){ x += dir*(30 + Math.random()*55); y = Math.min(992, Math.max(870, y + (Math.random()-.5)*36)); pts.push([x,y]); }
+      const p = el('path', { d: 'M' + pts.map(p => p.map(v => v.toFixed(1)).join(' ')).join(' L'), class: 'crack' });
+      gCr.appendChild(p);
+      const L = p.getTotalLength(); p.style.strokeDasharray = L; p.style.strokeDashoffset = L;
+      for (let s = 0; s < pts.length - 1; s++){
+        const [x1,y1] = pts[s], [x2,y2] = pts[s+1];
+        for (let b = 0; b < 5 + (Math.random()*4|0); b++){
+          const t = Math.random(), bx = x1 + (x2-x1)*t, by = y1 + (y2-y1)*t + 1;
+          const h = 14 + Math.random()*Math.random()*78, bend = (Math.random()-.5)*48;
+          const d = `M${bx.toFixed(1)} ${by.toFixed(1)} Q${(bx+bend*.25).toFixed(1)} ${(by-h*.6).toFixed(1)} ${(bx+bend).toFixed(1)} ${(by-h).toFixed(1)}`;
+          const hue = 95 + Math.random()*45, lit = 30 + Math.random()*28;
+          const bl = el('path', { d, class: 'blade', stroke: `hsl(${hue} ${45+Math.random()*25}% ${lit}%)`, 'stroke-width': (1.4 + Math.random()*2.2).toFixed(2) });
+          gGr.appendChild(bl);
+          const BL = bl.getTotalLength(); bl.style.strokeDasharray = BL; bl.style.strokeDashoffset = BL;
+          bl.style.animationDelay = (-Math.random()*4.5).toFixed(2) + 's';
+          blades.push(bl);
+        }
+      }
+    }
+    for (let i = blades.length - 1; i > 0; i--){ const j = Math.random()*(i+1)|0; [blades[i], blades[j]] = [blades[j], blades[i]]; }
+  }
+  function drawCracks(){ gCr.querySelectorAll('.crack').forEach((c, i) => setTimeout(() => c.style.strokeDashoffset = 0, i*260)); }
+  function growGrass(f){
+    const target = Math.floor(f * blades.length);
+    for (let i = grown, k = 0; i < target; i++, k++){
+      const b = blades[i];
+      setTimeout(() => { b.style.strokeDashoffset = 0; setTimeout(() => b.classList.add('sway'), 1800); }, k * (hurry ? 2 : 14));
+    }
+    grown = Math.max(grown, target);
+    Snd.rustle(.012 + f * .05, 3);
+  }
+
+  /* ---------- sueño dentro de sueño ---------- */
+  const nest = $('#nest');
+  for (let i = 0; i < 6; i++){ const f = document.createElement('div'); f.className = 'frame'; f.style.animationDelay = (-i*2) + 's'; nest.appendChild(f); }
+
+  /* ---------- escritura ---------- */
+  async function typeLine(segs, cls){
+    const line = document.createElement('div'); line.className = 'line' + (cls ? ' ' + cls : '');
+    const txt = document.createElement('span'); txt.className = 'txt'; line.appendChild(txt);
+    stanzaEl.appendChild(line);
+    caret.classList.add('typing');
+    const spans = [];
+    for (const [t, c] of segs){
+      const s = document.createElement('span'); if (c) s.className = c;
+      txt.appendChild(s); txt.appendChild(caret); spans.push(s);
+      if (reduced){ s.textContent = t; Snd.key('.'); }
+      else for (const ch of t){ s.textContent += ch; Snd.key(ch); await wait(delayFor(ch)); }
+    }
+    caret.classList.remove('typing');
+    return { line, txt, spans };
+  }
+  async function clearStanza(){
+    stanzaEl.classList.add('out'); Snd.whoosh(); await wait(1300);
+    stanzaEl.innerHTML = ''; stanzaEl.classList.remove('out'); hurry = false;
+  }
+  const count = n => $('#count').textContent = `0${n} / 04`;
+  function flash(){ Snd.shutter(); const s = $('#shutter'); s.classList.remove('go'); void s.offsetWidth; s.classList.add('go'); }
+  function shake(){ body.classList.remove('shake'); void body.offsetWidth; body.classList.add('shake'); setTimeout(() => body.classList.remove('shake'), 600); }
+
+  /* ---------- el poema ---------- */
+  async function stanza1(){
+    count(1); feed.speed = 60; feed.target = 1; Snd.feed(.16, 3);
+    await wait(1400);
+    await typeLine([["Me alzo sobre el murmullo del "], ["feed", "mono"], [" sin fondo."]]);
+    await wait(700);
+    const l2 = await typeLine([["En la mano, "], ["capturas", "shot"], [" de una memoria"]]);
+    flash(); l2.spans[1].classList.add('captured');
+    await wait(450);
+    const l3 = await typeLine([["que ya no sabe si ocurrió."]]);
+    await wait(300); l3.line.classList.add('forget');
+    await wait(1000);
+    const l4 = await typeLine([["Creí que mi reino eran los "], ["axiomas", "mono"], [","]]);
+    await wait(350);
+    const l5 = await typeLine([["la soberanía limpia del "], ["código.", "mono"]]);
+    await wait(1500);
+    l4.txt.classList.add('struck'); Snd.strike(); await wait(600); l5.txt.classList.add('struck'); Snd.strike();
+    await wait(2800); await clearStanza();
+  }
+  async function stanza2(){
+    count(2); feed.speed = 16; feed.target = .3; Snd.feed(.04, 3);
+    $('#bg404').classList.add('on'); Snd.error(); drawCracks(); Snd.crackle();
+    await wait(1800);
+    await typeLine([["Sobre un "], ["Error 404", "mono"], [" levanté un prado."]]);
+    growGrass(.22); await wait(1000);
+    await typeLine([["Cada día dejo que la hierba"]]);
+    growGrass(.55); await wait(300);
+    await typeLine([["se cuele, "], ["terca y verde", "green"], [","]]);
+    growGrass(.82); await wait(300);
+    await typeLine([["por las "], ["grietas", "crackw"], [" de la red."]]);
+    growGrass(1);
+    await wait(3400); await clearStanza();
+  }
+  async function stanza3(){
+    count(3); feed.target = 0; $('#bg404').classList.remove('on');
+    Snd.feed(0, 2); Snd.rustle(.012, 3); Snd.hum(.035, 3);
+    $('#garden').style.opacity = .55;
+    await wait(1400);
+    await typeLine([["Hoy, frente al brillo mudo de la pantalla,"]]);
+    await wait(500);
+    const l2 = await typeLine([["reclamo el "], ["vacío", "void"], [" como tierra mía:"]]);
+    l2.spans[1].classList.add('open'); Snd.voidSweep();
+    await wait(700);
+    const ld = $('#loader'); ld.classList.add('on'); ld.style.width = '71%'; Snd.loading();
+    await typeLine([["el segundo en que la página no carga,"]]);
+    ld.classList.add('stall'); Snd.stall();
+    await wait(900);
+    const l4 = await typeLine([["el "], ["glitch", "mono"], [" que ningún algoritmo prevé."]]);
+    const g = l4.spans[1]; g.dataset.text = 'glitch'; g.classList.add('glitch');
+    Snd.glitch(); if (!reduced) shake();
+    await wait(3400);
+    ld.classList.remove('on', 'stall'); Snd.loaded(); Snd.hum(0, 1.5);
+    await clearStanza(); ld.style.width = '0';
+  }
+  async function stanza4(){
+    count(4); stanzaEl.classList.add('final');
+    $('#garden').style.opacity = .7; nest.classList.add('on');
+    Snd.pad(.055, 5); Snd.rustle(.02, 4);
+    await wait(1800);
+    await typeLine([["Si todo es un sueño dentro de otro sueño,"]]);
+    await wait(1100);
+    Snd.bell(659.25);
+    await typeLine([["soy yo quien sueña."]], 'bright');
+    await wait(1500);
+    await typeLine([["El cursor parpadea en mi mano."]]);
+    caret.classList.add('final'); Snd.bell(440, .06); Snd.blink(12);
+    await wait(3800);
+    $('#hint').style.opacity = 0;
+    $('#replay').classList.add('on');
+  }
+
+  async function run(){
+    seedGarden(); body.classList.add('playing'); $('#hint').style.opacity = 1;
+    await stanza1(); await stanza2(); await stanza3(); await stanza4();
+  }
+  function reset(){
+    $('#replay').classList.remove('on');
+    stanzaEl.innerHTML = ''; stanzaEl.classList.remove('final');
+    caret.classList.remove('final'); nest.classList.remove('on');
+    $('#garden').style.opacity = 1; $('#bg404').classList.remove('on');
+    feed.target = 0; hurry = false; Snd.reset();
+  }
+
+  $('#play').addEventListener('click', () => { Snd.init(); $('#intro').classList.add('out'); setTimeout(run, 900); });
+  $('#replay').addEventListener('click', () => { Snd.init(); reset(); setTimeout(run, 1200); });
+  $('#mute').addEventListener('click', e => {
+    const on = Snd.toggle(); e.currentTarget.textContent = on ? '♪ SONIDO: SÍ' : '♪ SONIDO: NO';
+    e.currentTarget.setAttribute('aria-pressed', on);
+  });
+  $('#stage').addEventListener('click', () => { if (body.classList.contains('playing')) hurry = true; });
+})();
+</script>
+</body>
+</html>
