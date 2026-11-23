@@ -22,7 +22,7 @@
   html,body{height:100%;background:var(--bg);color:var(--ink);overflow:hidden}
   body{font-family:var(--serif);-webkit-font-smoothing:antialiased}
 
-  canvas#feed{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+  canvas#feed{position:fixed;inset:0;width:100%;height:100%;z-index:0;transition:opacity 2.5s ease}
 
   #bg404{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:var(--mono);font-weight:500;font-size:min(42vw,52vh);letter-spacing:-.04em;
@@ -43,6 +43,10 @@
     border:1px solid rgba(235,231,222,.22);border-radius:14px;opacity:0;animation:zoom 12s linear infinite}
   @keyframes zoom{0%{transform:scale(.08);opacity:0}15%{opacity:.7}80%{opacity:.25}100%{transform:scale(2.6);opacity:0}}
 
+  /* pasillo infinito del final */
+  #hall{position:fixed;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;opacity:0;transition:opacity 3s ease}
+  #hall.on{opacity:1}
+  main#stage.hall{align-items:flex-start;padding-top:12vh}
   #loader{position:fixed;top:0;left:0;height:2px;width:0;background:linear-gradient(90deg,var(--cyan),#fff);
     box-shadow:0 0 10px var(--cyan);z-index:20;opacity:0;transition:width 2.6s cubic-bezier(.1,.8,.2,1),opacity .6s}
   #loader.on{opacity:1}
@@ -140,6 +144,7 @@
     <g id="cracks"></g><g id="grass"></g>
   </svg>
   <div id="nest" aria-hidden="true"></div>
+  <canvas id="hall" aria-hidden="true"></canvas>
   <div id="loader" aria-hidden="true"></div>
   <div id="shutter" aria-hidden="true"></div>
 
@@ -260,10 +265,13 @@
         }
       },
       bell(f, vol = .08){ tone({ freq: f, dur: 3.5, vol, attack: .004 }); tone({ freq: f * 2.76, dur: 1.4, vol: vol * .3, attack: .004 }); tone({ freq: f * 5.4, dur: .6, vol: vol * .12, attack: .004 }); },
+      // el cursor del fondo del pasillo: cada parpadeo suena (un pulso grave y un brillo)
+      hallPulse(){ if (!ctx) return; tone({ freq: 110, dur: .9, vol: .05, attack: .015 }); tone({ freq: 220.5, dur: .6, vol: .025, attack: .015 }); tone({ freq: 1760, dur: .07, vol: .012 }); this.tick(.018); },
+      hallHum(v, sec = 3){ if (!ctx) return; if (!amb.hall){ amb.hall = ctx.createGain(); amb.hall.gain.value = 0; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400; lp.connect(amb.hall); amb.hall.connect(master); [55, 82.4, 110.2].forEach((f, i) => { const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f; const g = ctx.createGain(); g.gain.value = [.5, .3, .2][i]; o.connect(g).connect(lp); o.start(); }); } ramp(amb.hall, v, sec); },
       blink(n = 12){ let k = 0; this.tick(.025); blinkTimer = every(() => { if (++k >= n) return stop(blinkTimer); this.tick(.025); }, 1300); },
       reset(){
         timers.forEach(id => { clearInterval(id); clearTimeout(id); }); timers.length = 0;
-        if (!ctx) return; ramp(amb.feed.gain, 0, 1); ramp(amb.rustle.gain, 0, 1); ramp(amb.hum, 0, 1); ramp(amb.pad, 0, 1.5);
+        if (!ctx) return; ramp(amb.feed.gain, 0, 1); ramp(amb.rustle.gain, 0, 1); ramp(amb.hum, 0, 1); ramp(amb.pad, 0, 1.5); if (amb.hall) ramp(amb.hall, 0, 1.5);
       }
     };
   })();
@@ -385,6 +393,67 @@
   function flash(){ Snd.shutter(); const s = $('#shutter'); s.classList.remove('go'); void s.offsetWidth; s.classList.add('go'); }
   function shake(){ body.classList.remove('shake'); void body.offsetWidth; body.classList.add('shake'); setTimeout(() => body.classList.remove('shake'), 600); }
 
+  /* ---------- pasillo infinito: un cursor parpadea al fondo y nunca se alcanza ---------- */
+  const Hall = (() => {
+    const hc = $('#hall'), g = hc.getContext('2d');
+    const PERIOD = 1.3;               // igual que el parpadeo del cursor del poema
+    const SPACING = 1, NEAR = .35, FAR = 26, SPEED = .55;
+    let W = 0, H = 0, dpr = 1, raf = 0, t0 = 0, running = false, wasOn = false, light = 0, last = 0;
+    function size(){ dpr = Math.min(devicePixelRatio || 1, 2); W = hc.clientWidth || innerWidth; H = hc.clientHeight || innerHeight; hc.width = W * dpr; hc.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    function draw(now){
+      const t = (now - t0) / 1000, dt = Math.min(.05, (now - last) / 1000); last = now;
+      const on = (t % PERIOD) < PERIOD / 2;
+      if (on && !wasOn) Snd.hallPulse();
+      wasOn = on;
+      caret.style.opacity = on ? 1 : 0;                       // el cursor del poema late con el del pasillo
+      light += ((on ? 1 : 0) - light) * Math.min(1, dt * (on ? 18 : 5));   // la luz sube rápido y se apaga despacio
+      const vx = W / 2, vy = H * .64;                          // punto de fuga: allí está el cursor
+      const F = Math.min(W, H) * .5, RW = 1.15, RH = .9;       // medidas del pasillo
+      const off = reduced ? 0 : (t * SPEED) % SPACING;         // la cámara avanza… y el fondo nunca llega
+      g.fillStyle = '#04050a'; g.fillRect(0, 0, W, H);
+      // la luz crece hacia el fondo, pero una niebla se traga los últimos metros: allí solo queda el cursor
+      const lit = z => { const k = Math.max(0, Math.min(1, z / FAR)); const fog = 1 - Math.pow(Math.max(0, (k - .45) / .55), .8); return (.07 + (.2 + .8 * light) * Math.pow(k, .9)) * fog; };
+      const rect = z => { const s = F / z; return [vx - RW * s, vy - RH * s, vx + RW * s, vy + RH * s]; };
+      // marcos del pasillo, de lejos hacia cerca
+      const zs = []; for (let z = FAR - off; z > NEAR; z -= SPACING) zs.push(z);
+      for (let i = 0; i < zs.length - 1; i++){
+        const za = zs[i], zb = zs[i + 1], a = rect(za), b = rect(zb), la = lit(za);
+        const band = (i + Math.floor((t * SPEED) / SPACING)) % 2 === 0 ? 1 : .82;
+        // suelo, techo y paredes con la luz que llega del cursor
+        const face = (pts, k) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let j = 2; j < pts.length; j += 2) g.lineTo(pts[j], pts[j + 1]); g.closePath(); g.fillStyle = `rgba(150,170,215,${(la * k * band).toFixed(3)})`; g.fill(); };
+        face([a[0], a[3], a[2], a[3], b[2], b[3], b[0], b[3]], .34);   // suelo
+        face([a[0], a[1], a[2], a[1], b[2], b[1], b[0], b[1]], .14);   // techo
+        face([a[0], a[1], a[0], a[3], b[0], b[3], b[0], b[1]], .22);   // pared izquierda
+        face([a[2], a[1], a[2], a[3], b[2], b[3], b[2], b[1]], .22);   // pared derecha
+        g.strokeStyle = `rgba(225,232,250,${Math.min(.75, la * 1.15).toFixed(3)})`; g.lineWidth = 1;
+        g.strokeRect(a[0], a[1], a[2] - a[0], a[3] - a[1]);
+      }
+      // aristas largas hacia el fondo
+      const e = rect(NEAR), f = rect(FAR * .55);
+      g.strokeStyle = `rgba(200,212,240,${(.08 + .22 * light).toFixed(3)})`;
+      [[0, 1], [2, 1], [0, 3], [2, 3]].forEach(([x, y]) => { g.beginPath(); g.moveTo(e[x], e[y]); g.lineTo(f[x], f[y]); g.stroke(); });
+      // halo y cursor al fondo: siempre del mismo tamaño, nunca se acerca
+      const ch = Math.max(10, Math.min(W, H) * .045), cw = Math.max(2, ch * .13);
+      const halo = g.createRadialGradient(vx, vy, 0, vx, vy, ch * 9);
+      halo.addColorStop(0, `rgba(255,255,255,${(.5 * light).toFixed(3)})`); halo.addColorStop(.25, `rgba(190,215,255,${(.14 * light).toFixed(3)})`); halo.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = halo; g.fillRect(vx - ch * 9, vy - ch * 9, ch * 18, ch * 18);
+      // reflejo en el suelo
+      const refl = g.createRadialGradient(vx, vy + ch * 2.2, 0, vx, vy + ch * 2.2, ch * 6);
+      refl.addColorStop(0, `rgba(210,225,255,${(.16 * light).toFixed(3)})`); refl.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = refl; g.fillRect(vx - ch * 6, vy, ch * 12, ch * 8);
+      g.shadowColor = 'rgba(255,255,255,.9)'; g.shadowBlur = 18 * light;
+      g.fillStyle = `rgba(255,255,255,${(.08 + .92 * light).toFixed(3)})`; g.fillRect(vx - cw / 2, vy - ch / 2, cw, ch);
+      g.shadowBlur = 0;
+      if (running) raf = requestAnimationFrame(draw);
+    }
+    return {
+      start(){ size(); running = true; t0 = last = performance.now(); wasOn = false; light = 0; caret.style.animation = 'none'; hc.classList.add('on'); Snd.hallHum(.05, 4); cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); },
+      stop(){ hc.classList.remove('on'); caret.style.animation = ''; caret.style.opacity = ''; setTimeout(() => { running = false; cancelAnimationFrame(raf); }, 3000); },
+      size
+    };
+  })();
+  addEventListener('resize', () => Hall.size());
+
   /* ---------- el poema ---------- */
   async function stanza1(){
     count(1); feed.speed = 60; feed.target = 1; Snd.feed(.16, 3);
@@ -440,8 +509,8 @@
     await clearStanza(); ld.style.width = '0';
   }
   async function stanza4(){
-    count(4); stanzaEl.classList.add('final');
-    $('#garden').style.opacity = .7; nest.classList.add('on');
+    count(4); stanzaEl.classList.add('final'); $('#stage').classList.add('hall');
+    $('#garden').style.opacity = 0; $('#feed').style.opacity = 0;
     Snd.pad(.055, 5); Snd.rustle(.02, 4);
     await wait(1800);
     await typeLine([["Si todo es un sueño dentro de otro sueño,"]]);
@@ -450,7 +519,8 @@
     await typeLine([["soy yo quien sueña."]], 'bright');
     await wait(1500);
     await typeLine([["El cursor parpadea en mi mano."]]);
-    caret.classList.add('final'); Snd.bell(440, .06); Snd.blink(12);
+    caret.classList.add('final'); Snd.bell(440, .06);
+    Hall.start();                         // el pasillo se enciende: el cursor del fondo nunca se alcanza
     await wait(3800);
     $('#hint').style.opacity = 0;
     $('#replay').classList.add('on');
@@ -463,8 +533,8 @@
   function reset(){
     $('#replay').classList.remove('on');
     stanzaEl.innerHTML = ''; stanzaEl.classList.remove('final');
-    caret.classList.remove('final'); nest.classList.remove('on');
-    $('#garden').style.opacity = 1; $('#bg404').classList.remove('on');
+    caret.classList.remove('final'); nest.classList.remove('on'); Hall.stop(); $('#stage').classList.remove('hall');
+    $('#garden').style.opacity = 1; $('#feed').style.opacity = ''; $('#bg404').classList.remove('on');
     feed.target = 0; hurry = false; Snd.reset();
   }
 
