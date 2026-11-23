@@ -276,7 +276,7 @@
   function newCard(x, y, w){ return { x, y, w, h: 110 + Math.random()*180, img: Math.random() > .45, bars: 1 + (Math.random()*3|0), n: 50 + Math.random()*90 }; }
   function build(){
     const dpr = Math.min(devicePixelRatio || 1, 2);
-    W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; cx.setTransform(dpr,0,0,dpr,0,0);
+    W = cv.clientWidth || innerWidth; H = cv.clientHeight || innerHeight; cv.width = W*dpr; cv.height = H*dpr; cx.setTransform(dpr,0,0,dpr,0,0);
     const colW = W < 600 ? 200 : 260, n = Math.ceil(W / colW) + 1, off = (W - n*colW)/2;
     cols = [];
     for (let i = 0; i < n; i++){
@@ -475,6 +475,44 @@
     e.currentTarget.setAttribute('aria-pressed', on);
   });
   $('#stage').addEventListener('click', () => { if (body.classList.contains('playing')) hurry = true; });
+})();
+</script>
+
+<!-- botón de pantalla completa (solo aparece en navegadores que lo permiten) -->
+<script>
+(function () {
+  var d = document, de = d.documentElement;
+  var req = de.requestFullscreen || de.webkitRequestFullscreen;
+  if (!req) return; // p. ej. Safari en iPhone: no hay pantalla completa para páginas
+  var MODE = "float", WHERE = "tr", LABEL = "icon";
+  var btn = d.createElement("button");
+  btn.type = "button"; btn.id = "fsbtn";
+  function isFs() { return !!(d.fullscreenElement || d.webkitFullscreenElement); }
+  function paint() {
+    var on = isFs();
+    btn.textContent = LABEL === "icon" ? (on ? "\u2715" : "\u26F6") : (on ? "\u2715 salir" : "\u26F6 pantalla completa");
+    btn.title = on ? "Salir de pantalla completa" : "Pantalla completa";
+    btn.setAttribute("aria-label", btn.title);
+  }
+  btn.addEventListener("click", function (e) {
+    e.stopPropagation(); e.preventDefault();
+    if (isFs()) { (d.exitFullscreen || d.webkitExitFullscreen).call(d); }
+    else { var p = req.call(de); if (p && p.catch) p.catch(function () {}); }
+  });
+  ["pointerdown", "mousedown", "touchstart", "pointerup", "mouseup"].forEach(function (ev) {
+    btn.addEventListener(ev, function (e) { e.stopPropagation(); });
+  });
+  d.addEventListener("fullscreenchange", paint);
+  d.addEventListener("webkitfullscreenchange", paint);
+  var host = MODE === "group" ? d.querySelector(WHERE) : null;
+  if (host) host.appendChild(btn);
+  else {
+    btn.setAttribute("style", "position:fixed;bottom:10px;right:10px;z-index:2147483000;min-width:38px;height:38px;padding:0 10px;background:rgba(0,0,0,.55);color:#e6e6e6;border:1px solid rgba(255,255,255,.35);border-radius:6px;font:18px/1 ui-monospace,Menlo,Consolas,monospace;cursor:pointer;opacity:.75");
+    btn.onmouseenter = function () { btn.style.opacity = "1"; };
+    btn.onmouseleave = function () { btn.style.opacity = ".75"; };
+    d.body.appendChild(btn);
+  }
+  paint();
 })();
 </script>
 </body>
